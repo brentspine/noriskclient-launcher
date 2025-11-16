@@ -181,25 +181,7 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
 
   // Launch handler with abort functionality
   const handleLaunch = async () => {
-    const currentProfile = getProfileState(profileId);
-
-    if (currentProfile.isButtonLaunching) {
-      try {
-        setButtonStatusMessage(profileId, "Attempting to stop...");
-        await ProcessService.abort(profileId);
-        toast.success("Launch process stopped.");
-        finalizeButtonLaunch(profileId);
-      } catch (err: any) {
-        console.error("Failed to abort launch:", err);
-        const abortErrorMsg =
-          typeof err === "string"
-            ? err
-            : err.message || err.toString() || "Error during abort.";
-        toast.error(`Stop failed: ${abortErrorMsg}`);
-        finalizeButtonLaunch(profileId, abortErrorMsg);
-      }
-      return;
-    }
+    if(await abortIfProfileIsLaunching()) return;
 
     // Check if migration is needed
     try {
@@ -232,31 +214,39 @@ export function useProfileLaunch(options: UseProfileLaunchOptions) {
     }
   };
 
+  /** Returns true, if a launch was aborted **/
+  const abortIfProfileIsLaunching = async (): Promise<boolean> => {
+    const currentProfile = getProfileState(profileId);
+
+    if (!currentProfile.isButtonLaunching) {
+      return false;
+    }
+
+    try {
+      setButtonStatusMessage(profileId, "Attempting to stop...");
+      await ProcessService.abort(profileId);
+      toast.success("Launch process stopped.");
+      finalizeButtonLaunch(profileId);
+    } catch (err: any) {
+      console.error("Failed to abort launch:", err);
+      const abortErrorMsg =
+          typeof err === "string"
+              ? err
+              : err.message || err.toString() || "Error during abort.";
+      toast.error(`Stop failed: ${abortErrorMsg}`);
+      finalizeButtonLaunch(profileId, abortErrorMsg);
+    }
+
+    return true;
+  };
+
   return {
     isLaunching: isButtonLaunching,
     statusMessage: buttonStatusMessage,
     launchState,
     handleLaunch,
     handleQuickPlayLaunch: async (singleplayer?: string, multiplayer?: string) => {
-      const currentProfile = getProfileState(profileId);
-
-      if (currentProfile.isButtonLaunching) {
-        try {
-          setButtonStatusMessage(profileId, "Attempting to stop...");
-          await ProcessService.abort(profileId);
-          toast.success("Launch process stopped.");
-          finalizeButtonLaunch(profileId);
-        } catch (err: any) {
-          console.error("Failed to abort launch:", err);
-          const abortErrorMsg =
-            typeof err === "string"
-              ? err
-              : err.message || err.toString() || "Error during abort.";
-          toast.error(`Stop failed: ${abortErrorMsg}`);
-          finalizeButtonLaunch(profileId, abortErrorMsg);
-        }
-        return;
-      }
+      if(await abortIfProfileIsLaunching()) return;
 
       // Check if migration is needed
       try {
