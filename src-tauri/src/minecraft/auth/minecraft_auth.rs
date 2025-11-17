@@ -793,49 +793,24 @@ impl MinecraftAuthStore {
         );
 
         // Zuerst nur lesen um den aktiven Account zu finden
+        // (Könnte man extrahieren)
         let active_account = {
             info!("[Account Manager] Acquiring read lock to find active account");
             let accounts = self.accounts.read().await;
             info!("[Account Manager] Successfully acquired read lock");
             let account = accounts.iter().find(|acc| acc.active).cloned();
             info!(
-                "[Account Manager] Active account found: {}",
-                account.is_some()
-            );
+            "[Account Manager] Active account found: {}",
+            account.is_some()
+        );
             account
         };
 
         if let Some(account) = active_account {
-            info!(
-                "[Account Manager] Refreshing credentials for active account: {}",
-                account.username
-            );
-            // Refresh credentials if needed
-            let updated_account = self
-                .update_norisk_and_microsoft_token(&account, is_experimental)
+            let refreshed = self
+                .refresh_and_persist_account(&account)
                 .await?;
-
-            if let Some(updated) = updated_account {
-                // Aktualisiere den Account in der Liste
-                {
-                    info!("[Account Manager] Acquiring write lock to update account");
-                    let mut accounts = self.accounts.write().await;
-                    info!("[Account Manager] Successfully acquired write lock");
-                    if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
-                        info!("[Account Manager] Updating account in list");
-                        *existing = updated.clone();
-                    }
-                    info!("[Account Manager] Releasing write lock");
-                } // Write-Lock wird hier freigegeben
-
-                info!("[Account Manager] Saving updated account");
-                self.save().await?;
-                info!("[Account Manager] Successfully saved account");
-
-                Ok(Some(updated))
-            } else {
-                Ok(Some(account))
-            }
+            Ok(refreshed)
         } else {
             info!("[Account Manager] No active account found, checking for any accounts");
 
@@ -844,9 +819,9 @@ impl MinecraftAuthStore {
                 let mut accounts = self.accounts.write().await;
                 if let Some(first_account) = accounts.first_mut() {
                     info!(
-                        "[Account Manager] Setting first account as active: {}",
-                        first_account.username
-                    );
+                    "[Account Manager] Setting first account as active: {}",
+                    first_account.username
+                );
                     first_account.active = true;
                     Some(first_account.clone())
                 } else {
@@ -863,6 +838,67 @@ impl MinecraftAuthStore {
                 info!("[Account Manager] No accounts found at all");
                 Ok(None)
             }
+        }
+    }
+
+    pub async fn refresh_and_persist_account_by_id(
+        &self,
+        account_id: Uuid,
+    ) -> Result<Option<Credentials>> {
+        info!(
+            "[Account Manager] Starting refresh for account ID: {}",
+            account_id
+        );
+
+        let existing_account = self.get_account_by_id(account_id).await?;
+
+        if let Some(ref account) = existing_account {
+            return self
+                .refresh_and_persist_account(account)
+                .await;
+        }
+
+        info!(
+        "[Account Manager] Could not refresh account with ID {}: account not found",
+        account_id
+    );
+        Ok(None)
+    }
+
+    pub async fn refresh_and_persist_account(
+        &self,
+        account: &Credentials,
+    ) -> Result<Option<Credentials>> {
+        let state = crate::state::State::get().await?;
+        let is_experimental = state.config_manager.is_experimental_mode().await;
+        info!(
+        "[Account Manager] Refreshing credentials for active account: {}",
+        account.username
+    );
+
+        let updated_account = self
+            .update_norisk_and_microsoft_token(account, is_experimental)
+            .await?;
+
+        if let Some(updated) = updated_account {
+            {
+                info!("[Account Manager] Acquiring write lock to update account");
+                let mut accounts = self.accounts.write().await;
+                info!("[Account Manager] Successfully acquired write lock");
+                if let Some(existing) = accounts.iter_mut().find(|acc| acc.id == updated.id) {
+                    info!("[Account Manager] Updating account in list");
+                    *existing = updated.clone();
+                }
+                info!("[Account Manager] Releasing write lock");
+            }
+
+            info!("[Account Manager] Saving updated account");
+            self.save().await?;
+            info!("[Account Manager] Successfully saved account");
+
+            Ok(Some(updated))
+        } else {
+            Ok(Some(account.clone()))
         }
     }
 

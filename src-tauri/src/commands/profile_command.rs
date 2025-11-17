@@ -247,7 +247,7 @@ pub async fn launch_profile(
 
     let version = profile.game_version.clone();
     let modloader = profile.loader.clone();
-    
+
     // Helper function to get active account with proper error handling
     let get_active_account = || async {
         match state
@@ -263,7 +263,7 @@ pub async fn launch_profile(
             }
         }
     };
-    
+
     // Determine which account to use: preferred account or global active account
     let credentials = if let Some(preferred_account_id) = profile.preferred_account_id {
         log::info!(
@@ -301,6 +301,19 @@ pub async fn launch_profile(
         log::info!("[Command] No preferred account set. Using global active account.");
         get_active_account().await?
     };
+
+    // Should fix #2265
+    let mut credentials = credentials;
+    if let Some(ref mut creds) = credentials {
+        let refreshed = state
+            .minecraft_account_manager_v2
+            .refresh_and_persist_account(creds)
+            .await?;
+
+        if let Some(updated) = refreshed {
+            *creds = updated;
+        }
+    }
 
     let profile_id = profile.id; // Store profile ID for later use
     let profile_clone = profile.clone();

@@ -140,3 +140,16 @@ pub async fn get_accounts() -> Result<Vec<Credentials>, CommandError> {
         .await?;
     Ok(accounts)
 }
+
+#[tauri::command]
+pub async fn update_norisk_and_microsoft_token(
+    creds: Credentials,
+    experimental_mode: bool
+) -> Result<Option<Credentials>, CommandError> {
+    let state = State::get().await?;
+    let new_creds = state
+        .minecraft_account_manager_v2
+        .update_norisk_and_microsoft_token(&creds, experimental_mode)
+        .await?;
+    Ok(new_creds)
+}

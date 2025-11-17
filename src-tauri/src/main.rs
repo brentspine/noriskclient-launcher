@@ -28,7 +28,7 @@ use crate::commands::process_command::{
     open_log_window, set_discord_state, stop_process,
 };
 use commands::minecraft_auth_command::{
-    begin_login, get_accounts, get_active_account, remove_account, set_active_account,
+    begin_login, get_accounts, get_active_account, remove_account, set_active_account, update_norisk_and_microsoft_token,
 };
 use commands::minecraft_command::{
     add_skin,
@@ -381,6 +381,7 @@ async fn main() {
             remove_account,
             get_active_account,
             set_active_account,
+            update_norisk_and_microsoft_token,
             get_accounts,
             search_modrinth_mods,
             search_modrinth_projects,
