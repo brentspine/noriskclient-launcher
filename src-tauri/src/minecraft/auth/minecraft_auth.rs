@@ -793,16 +793,16 @@ impl MinecraftAuthStore {
         );
 
         // Zuerst nur lesen um den aktiven Account zu finden
-        // (Könnte man extrahieren)
+        // (Könnte man extrahieren -> get_account_by_id mit Log Flag)
         let active_account = {
             info!("[Account Manager] Acquiring read lock to find active account");
             let accounts = self.accounts.read().await;
             info!("[Account Manager] Successfully acquired read lock");
             let account = accounts.iter().find(|acc| acc.active).cloned();
             info!(
-            "[Account Manager] Active account found: {}",
-            account.is_some()
-        );
+                "[Account Manager] Active account found: {}",
+                account.is_some()
+            );
             account
         };
 
@@ -819,9 +819,9 @@ impl MinecraftAuthStore {
                 let mut accounts = self.accounts.write().await;
                 if let Some(first_account) = accounts.first_mut() {
                     info!(
-                    "[Account Manager] Setting first account as active: {}",
-                    first_account.username
-                );
+                        "[Account Manager] Setting first account as active: {}",
+                        first_account.username
+                    );
                     first_account.active = true;
                     Some(first_account.clone())
                 } else {
